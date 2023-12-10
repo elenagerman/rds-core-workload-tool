@@ -11,6 +11,7 @@ import (
 
 // RunSCTP runs a sctp server
 func RunSCTP(serverAddr string, port int, mtu int, interfaceName string, protocolVersion int) {
+	log.Print("Start SCTP server")
 	address, err := net.ResolveIPAddr("ip", serverAddr)
 	if err != nil {
 		exitWithError(err)
@@ -53,21 +54,27 @@ func RunSCTP(serverAddr string, port int, mtu int, interfaceName string, protoco
 	if err != nil {
 		exitWithError(err)
 	}
+	defer listener.Close()
+	for {
 
-	conn, err := listener.Accept()
-	if err != nil {
-		exitWithError(err)
-	}
+		conn, err := listener.Accept()
+		if err != nil {
+			exitWithError(err)
+		}
 
-	buf := make([]byte, mtu)
-	_, err = conn.Read(buf)
-	if err != nil {
-		exitWithError(err)
-	}
+		buf := make([]byte, mtu)
+		n, err := conn.Read(buf)
+		if err != nil {
+			exitWithError(err)
+		}
 
-	err = conn.Close()
-	if err != nil {
-		exitWithError(err)
+		err = conn.Close()
+		if err != nil {
+			exitWithError(err)
+		}
+		log.Printf("packet-received: bytes=%d from=%s\n",
+			n, conn.RemoteAddr())
+
 	}
 }
 
