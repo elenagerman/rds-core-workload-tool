@@ -40,12 +40,16 @@ func handleConnection(conn net.Conn, bufferSize int) {
 		buffer := make([]byte, bufferSize)
 		n, err := conn.Read(buffer)
 		if err != nil {
-			log.Print(fmt.Sprintf("Connection from client: %s closed", conn.RemoteAddr()))
+			log.Printf("Connection from client: %s closed", conn.RemoteAddr())
 			return
 		}
 		log.Printf("packet-received: bytes=%d from=%s\n",
 			n, conn.RemoteAddr())
-		conn.Write([]byte(buffer[:n]))
+		_, err = conn.Write([]byte(buffer[:n]))
+		if err != nil {
+			log.Printf("Failed to retrieve traffic from the client due to %v", err)
+			return
+		}
 	}
 
 	conn.Close()

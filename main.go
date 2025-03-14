@@ -17,8 +17,7 @@ const (
 )
 
 var (
-	supportedProtocols       = []string{protocols.ProtocolICMP, protocols.ProtocolUDP, protocols.ProtocolTCP, protocols.ProtocolSCTP}
-	supportedServerProtocols = []string{protocols.ProtocolUDP, protocols.ProtocolSCTP}
+	supportedProtocols = []string{protocols.ProtocolICMP, protocols.ProtocolUDP, protocols.ProtocolTCP, protocols.ProtocolSCTP}
 )
 
 func validateIP(host string, multicast bool) error {
@@ -83,6 +82,9 @@ func main() {
 	mtu := flag.Int("mtu", 1450, "MTU Size. Options: Any int in range 50-9000")
 	dstAddress := flag.String("server", "", "Destination ip address IPv4/IPv6")
 	serverPort := flag.Int("port", 80, "Port number. Options: Any int in range 1-65534")
+	packagesNumber := flag.Int("packages", 5, "Packages number. Options: Any int in range 1-65534")
+	timeoutTCP := flag.Int("timeoutTCP", 2, "Session timeout TCP. Options: Any int in range 1-65534")
+	timeoutUDP := flag.Int("timeoutUDP", 5, "Session timeout UDP. Options: Any int in range 1-65534")
 	negative := flag.Bool("negative", false, "Insert this flag if no connectivity expected")
 	flag.Parse()
 
@@ -123,7 +125,7 @@ func main() {
 				}
 				servers.RunUDPServer(*serverPort, *mtu)
 			case protocols.ProtocolSCTP:
-				servers.RunSCTP(*dstAddress, *serverPort, *mtu, *interfaceName, ipProtocolVersion(*dstAddress))
+				servers.RunSCTP(*dstAddress, *serverPort, *mtu, *interfaceName, ipProtocolVersion(*dstAddress), *packagesNumber)
 			case protocols.ProtocolTCP:
 				servers.RunTCPServer(*dstAddress, *serverPort, *interfaceName, *mtu)
 			}
@@ -140,7 +142,7 @@ func main() {
 
 	switch *protocol {
 	case protocols.ProtocolICMP:
-		test := protocols.NewICMPTest(*mtu, protocolVersion, *dstAddress, *interfaceName, *negative)
+		test := protocols.NewICMPTest(*mtu, protocolVersion, *dstAddress, *interfaceName, *packagesNumber, *negative)
 		test.RunTest()
 
 	case protocols.ProtocolTCP:
@@ -149,7 +151,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		test := protocols.NewTCPTest(*mtu, protocolVersion, *dstAddress, *serverPort, *negative, *interfaceName)
+		test := protocols.NewTCPTest(*mtu, protocolVersion, *dstAddress, *serverPort, *packagesNumber, *negative, *timeoutTCP, *interfaceName)
 		test.RunTest()
 
 	case protocols.ProtocolUDP:
@@ -158,7 +160,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		test := protocols.NewUDPTest(*mtu, protocolVersion, *dstAddress, *serverPort, *negative, *multicast, *broadcast, *interfaceName)
+		test := protocols.NewUDPTest(*mtu, protocolVersion, *dstAddress, *serverPort, *packagesNumber, *negative, *multicast, *broadcast, *timeoutUDP, *interfaceName)
 		test.RunTest()
 
 	case protocols.ProtocolSCTP:
@@ -166,7 +168,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("port validation error: %v\n", err)
 		}
-		test := protocols.NewSCTPTest(*mtu, *dstAddress, protocolVersion, *serverPort, *negative)
+		test := protocols.NewSCTPTest(*mtu, *dstAddress, protocolVersion, *serverPort, *packagesNumber, *negative)
 		test.RunTest()
 	}
 }

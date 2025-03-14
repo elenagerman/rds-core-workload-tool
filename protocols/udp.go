@@ -11,22 +11,31 @@ import (
 
 const (
 	// ProtocolUDP the name of the protocol
-	ProtocolUDP       = "udp"
-	packagesNumberUDP = 5
-	timeout           = 5
+	ProtocolUDP = "udp"
 )
 
 // UDPTest define, run and process return code of udp test command
 type UDPTest struct {
-	CommonTest
+	common        CommonTest
 	ServerPort    int
 	Multicast     bool
 	Broadcast     bool
+	Timeout       time.Duration
 	InterfaceName *net.Interface
 }
 
-//NewUDPTest creates new instance of ConnectivityTestParameters
-func NewUDPTest(mtu int, protocolVersion int, serverIP string, serverPort int, negative bool, multicast bool, broadcast bool, interfaceName string) *UDPTest {
+// NewUDPTest creates new instance of ConnectivityTestParameters
+func NewUDPTest(
+	mtu int,
+	protocolVersion int,
+	serverIP string,
+	serverPort int,
+	packagesNumber int,
+	negative bool,
+	multicast bool,
+	broadcast bool,
+	timeout int,
+	interfaceName string) *UDPTest {
 	intFace, err := net.InterfaceByName(interfaceName)
 	if err != nil && multicast {
 		fmt.Print(err)
@@ -35,12 +44,24 @@ func NewUDPTest(mtu int, protocolVersion int, serverIP string, serverPort int, n
 	if err != nil {
 		intFace = nil
 	}
-	return &UDPTest{CommonTest{mtu, serverIP, protocolVersion, negative}, serverPort, multicast, broadcast, intFace}
+	return &UDPTest{
+		InterfaceName: intFace,
+		ServerPort:    serverPort,
+		Multicast:     multicast,
+		Broadcast:     broadcast,
+		Timeout:       time.Duration(timeout),
+		common: CommonTest{
+			MTU:             mtu,
+			ServerIP:        serverIP,
+			ProtocolVersion: protocolVersion,
+			PackagesNumber:  packagesNumber,
+			Negative:        negative,
+		}}
 }
 
 func (test *UDPTest) resolveAddress() *net.UDPAddr {
-	addr, err := net.ResolveUDPAddr(fmt.Sprintf("%s%d", ProtocolUDP, test.ProtocolVersion),
-		fmt.Sprintf("[%s]:%d", test.ServerIP, test.ServerPort))
+	addr, err := net.ResolveUDPAddr(fmt.Sprintf("%s%d", ProtocolUDP, test.common.ProtocolVersion),
+		fmt.Sprintf("[%s]:%d", test.common.ServerIP, test.ServerPort))
 	if err != nil {
 		fmt.Print(err)
 		os.Exit(1)
@@ -58,9 +79,9 @@ func (test *UDPTest) runUDPPing(
 	exitCode *int) {
 
 	time.Sleep(1 * time.Second)
-	buffer := make([]byte, test.MTU)
+	buffer := make([]byte, test.common.MTU)
 	startTime := time.Now()
-	deadline := time.Now().Add(timeout * time.Second)
+	deadline := time.Now().Add(test.Timeout * time.Second)
 	conn.SetDeadline(deadline)
 	f, err := conn.File()
 	if err != nil {
@@ -68,7 +89,7 @@ func (test *UDPTest) runUDPPing(
 		os.Exit(1)
 	}
 	timeVal := new(syscall.Timeval)
-	timeVal.Sec = timeout
+	timeVal.Sec = int64(test.Timeout)
 	err = syscall.SetsockoptTimeval(int(f.Fd()), syscall.SOL_SOCKET, syscall.SO_SNDTIMEO, timeVal)
 	if err != nil {
 		fmt.Printf("Error define send timeout %s", err)
@@ -79,7 +100,7 @@ func (test *UDPTest) runUDPPing(
 		fmt.Printf("Error define DF receive timeout %s", err)
 		os.Exit(1)
 	}
-	if test.ProtocolVersion == 4 {
+	if test.common.ProtocolVersion == 4 {
 		err = syscall.SetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DO)
 	} else {
 		err = syscall.SetsockoptInt(int(f.Fd()), syscall.IPPROTO_IPV6, syscall.IPV6_MTU_DISCOVER, syscall.IPV6_PMTUDISC_DO)
@@ -114,18 +135,19 @@ func (test *UDPTest) runUDPPing(
 
 func (test *UDPTest) testUnicastUDP() error {
 	raddr := test.resolveAddress()
-	conn, err := net.DialUDP(fmt.Sprintf("%s%d", ProtocolUDP, test.ProtocolVersion), nil, raddr)
+	conn, err := net.DialUDP(fmt.Sprintf("%s%d", ProtocolUDP, test.common.ProtocolVersion), nil, raddr)
 	if err != nil {
 		fmt.Print(err)
 		os.Exit(1)
 	}
 	defer conn.Close()
 	var testString string
-	for i := 1; i <= test.MTU; i++ {
+	for i := 1; i <= test.common.MTU; i++ {
 		testString += "a"
 	}
 	byteTestString := []byte(testString)
-	fmt.Printf(fmt.Sprintf("UDP PING %s %d(%d) bytes of data.\n", test.ServerIP, test.MTU, test.MTU+28))
+	fmt.Printf("UDP PING %s %d(%d) bytes of data.\n",
+		test.common.ServerIP, test.common.MTU, test.common.MTU+28)
 
 	var (
 		statTotalTime      int64
@@ -134,12 +156,20 @@ func (test *UDPTest) testUnicastUDP() error {
 		statPacketReceived int
 	)
 
-	for i := 1; i <= packagesNumberUDP; i++ {
-		test.runUDPPing(conn, i, byteTestString, &statPacketLost, &statPacketReceived, &statTotalTime, &exitCode)
+	for i := 1; i <= test.common.PackagesNumber; i++ {
+		test.runUDPPing(
+			conn,
+			i,
+			byteTestString,
+			&statPacketLost,
+			&statPacketReceived,
+			&statTotalTime,
+			&exitCode)
 	}
-	fmt.Printf(fmt.Sprintf("--- %s UDP statistics ---\n", test.ServerIP))
-	fmt.Printf(fmt.Sprintf("%d packets transmitted, %d received, %d packet loss, time %dms\n",
-		packagesNumberUDP, statPacketReceived, totalPackageLoss(packagesNumberUDP, statPacketLost), statTotalTime))
+	fmt.Printf("--- %s UDP statistics ---\n", test.common.ServerIP)
+	fmt.Printf("%d packets transmitted, %d received, %d packet loss, time %dms\n",
+		test.common.PackagesNumber, statPacketReceived,
+		totalPackageLoss(test.common.PackagesNumber, statPacketLost), statTotalTime)
 	if exitCode != 0 {
 		return fmt.Errorf("connectivity test failed")
 	}
@@ -147,9 +177,9 @@ func (test *UDPTest) testUnicastUDP() error {
 }
 
 func (test *UDPTest) receiveUDPTraffic(conn *net.UDPConn) error {
-	buffer := make([]byte, test.MTU)
-	for i := 0; i <= packagesNumberUDP; i++ {
-		deadline := time.Now().Add(timeout * time.Second)
+	buffer := make([]byte, test.common.MTU)
+	for i := 0; i <= test.common.PackagesNumber; i++ {
+		deadline := time.Now().Add(test.Timeout * time.Second)
 		conn.SetDeadline(deadline)
 		n, addr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
@@ -164,13 +194,14 @@ func (test *UDPTest) receiveUDPTraffic(conn *net.UDPConn) error {
 func (test *UDPTest) testMulticastUDP() error {
 	var err error
 	addr := test.resolveAddress()
-	pc, err := net.ListenMulticastUDP(fmt.Sprintf("%s%d", ProtocolUDP, test.ProtocolVersion), test.InterfaceName, addr)
+	pc, err := net.ListenMulticastUDP(fmt.Sprintf(
+		"%s%d", ProtocolUDP, test.common.ProtocolVersion), test.InterfaceName, addr)
 	if err != nil {
 		fmt.Print(err)
 		os.Exit(1)
 	}
 	defer pc.Close()
-	pc.SetReadBuffer(test.MTU)
+	pc.SetReadBuffer(test.common.MTU)
 	err = test.receiveUDPTraffic(pc)
 	if err != nil {
 		return err
@@ -187,7 +218,7 @@ func (test *UDPTest) testBroadcastUDP() error {
 		os.Exit(1)
 	}
 	defer pc.Close()
-	pc.SetReadBuffer(test.MTU)
+	pc.SetReadBuffer(test.common.MTU)
 	err = test.receiveUDPTraffic(pc)
 	if err != nil {
 		return err
@@ -207,7 +238,7 @@ func (test *UDPTest) RunTest() {
 		err = test.testUnicastUDP()
 	}
 	if err == nil {
-		if test.Negative {
+		if test.common.Negative {
 			fmt.Print("UDP Negative test failed")
 			os.Exit(1)
 		} else {
@@ -215,7 +246,7 @@ func (test *UDPTest) RunTest() {
 		}
 		os.Exit(0)
 	} else {
-		if test.Negative {
+		if test.common.Negative {
 			fmt.Print("UDP Negative test failed as expected")
 			os.Exit(0)
 		}

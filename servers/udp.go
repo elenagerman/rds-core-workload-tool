@@ -28,7 +28,7 @@ func defineSourceIP(interfaceName string, protocolVersion int) (*string, error) 
 		return nil, err
 	}
 	if len(intFaceAddreses) < 1 {
-		log.Print(fmt.Sprintf("error: can not find ip address on interface %s", interfaceName))
+		log.Printf("error: can not find ip address on interface %s", interfaceName)
 		return nil, err
 	}
 	for _, addr := range intFaceAddreses {
@@ -39,8 +39,8 @@ func defineSourceIP(interfaceName string, protocolVersion int) (*string, error) 
 		}
 	}
 	if intFaceAddr == "" {
-		log.Print(fmt.Sprintf("error: can not find ip address on interface %s", interfaceName))
-		return nil, fmt.Errorf(fmt.Sprintf("error: can not find ip address on interface %s", interfaceName))
+		log.Printf("error: can not find ip address on interface %s", interfaceName)
+		return nil, fmt.Errorf("error: can not find ip address on interface %s", interfaceName)
 	}
 	return &intFaceAddr, nil
 }

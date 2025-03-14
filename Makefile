@@ -15,3 +15,7 @@ gofmt:
 build:
 	@echo "Making testcmd binary"
 	scripts/build-testcmd-bin.sh
+
+lint:
+	@echo "Running go lint"
+	scripts/golangci-lint.sh

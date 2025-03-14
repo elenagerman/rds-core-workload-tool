@@ -10,7 +10,7 @@ import (
 )
 
 // RunSCTP runs a sctp server
-func RunSCTP(serverAddr string, port int, mtu int, interfaceName string, protocolVersion int) {
+func RunSCTP(serverAddr string, port int, mtu int, interfaceName string, protocolVersion int, packagesNumber int) {
 	log.Print("Start SCTP server")
 	address, err := net.ResolveIPAddr("ip", serverAddr)
 	if err != nil {
@@ -42,8 +42,8 @@ func RunSCTP(serverAddr string, port int, mtu int, interfaceName string, protoco
 			return err
 		},
 		InitMsg: sctp.InitMsg{
-			NumOstreams:  5,
-			MaxInstreams: 5,
+			NumOstreams:  uint16(packagesNumber),
+			MaxInstreams: uint16(packagesNumber),
 			MaxAttempts:  4,
 		},
 	}

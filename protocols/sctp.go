@@ -17,33 +17,38 @@ const (
 
 // SCTPTest is a struct with information for sctp test
 type SCTPTest struct {
-	CommonTest
+	common     CommonTest
 	ServerPort int
 }
 
 // NewSCTPTest returns a new SCTP test
-func NewSCTPTest(mtu int, serverIP string, protocolVersion int, serverPort int, negative bool) *SCTPTest {
-	return &SCTPTest{CommonTest{mtu, serverIP, protocolVersion, negative}, serverPort}
+func NewSCTPTest(
+	mtu int,
+	serverIP string,
+	protocolVersion int,
+	serverPort int,
+	numOfStreams int,
+	negative bool) *SCTPTest {
+	return &SCTPTest{
+		ServerPort: serverPort,
+		common: CommonTest{
+			MTU:             mtu,
+			ServerIP:        serverIP,
+			ProtocolVersion: protocolVersion,
+			PackagesNumber:  numOfStreams,
+			Negative:        negative,
+		}}
 }
 
-// RunTest runs the sctp test
-func (sctpTest *SCTPTest) RunTest() {
-	err := runClient(sctpTest.ServerIP, sctpTest.ServerPort, sctpTest.MTU, "", sctpTest.ProtocolVersion)
-	if sctpTest.Negative == true {
-		if err != nil {
-			log.Printf("SCTP test failed as expected with error: %v\n", err)
-			return
-		}
-		log.Fatalln("SCTP Negative test failed.")
-	}
-	if err != nil {
-		log.Fatalf("SCTP test failed with error: %v\n", err)
-	}
-	log.Println("SCTP test passed as expected")
-}
-
-func runClient(serverAddr string, port int, mtu int, interfaceName string, protocolVersion int) error {
-	address, err := net.ResolveIPAddr("ip", serverAddr)
+func runClient(
+	serverAddr string,
+	port int,
+	mtu int,
+	interfaceName string,
+	numOfStreams int,
+	protocolVersion int,
+) error {
+	address, _ := net.ResolveIPAddr("ip", serverAddr)
 	server := &sctp.SCTPAddr{
 		IPAddrs: []net.IPAddr{*address},
 		Port:    port,
@@ -69,8 +74,8 @@ func runClient(serverAddr string, port int, mtu int, interfaceName string, proto
 			return err
 		},
 		InitMsg: sctp.InitMsg{
-			NumOstreams:  5,
-			MaxInstreams: 5,
+			NumOstreams:  uint16(numOfStreams),
+			MaxInstreams: uint16(numOfStreams),
 			MaxAttempts:  4,
 		},
 	}
@@ -97,4 +102,26 @@ func runClient(serverAddr string, port int, mtu int, interfaceName string, proto
 	}
 
 	return conn.Close()
+}
+
+// RunTest runs the sctp test
+func (sctpTest *SCTPTest) RunTest() {
+	err := runClient(
+		sctpTest.common.ServerIP,
+		sctpTest.ServerPort,
+		sctpTest.common.MTU,
+		"",
+		sctpTest.common.PackagesNumber,
+		sctpTest.common.ProtocolVersion)
+	if sctpTest.common.Negative {
+		if err != nil {
+			log.Printf("SCTP test failed as expected with error: %v\n", err)
+			return
+		}
+		log.Fatalln("SCTP Negative test failed.")
+	}
+	if err != nil {
+		log.Fatalf("SCTP test failed with error: %v\n", err)
+	}
+	log.Println("SCTP test passed as expected")
 }

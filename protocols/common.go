@@ -10,10 +10,11 @@ type CommonTest struct {
 	MTU             int
 	ServerIP        string
 	ProtocolVersion int
+	PackagesNumber  int
 	Negative        bool
 }
 
-//RunCommand runs command and return output
+// RunCommand runs command and return output
 func (ct *CommonTest) RunCommand(cmd string) (string, error) {
 	commandOutput, err := exec.Command("/bin/sh", "-c", cmd).Output()
 	if err != nil {

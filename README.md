@@ -38,3 +38,6 @@ In order to build testcmd application run:
 * **server** - destination IPv4/IPv6 address
 * **port** - port number. Any integer number in range 1-65534 (default 80)
 * **negative** - insert this flag if **no** connectivity is expected
+* **packages** - packages number. Any integer number in range 1-65534 (default 5)
+* **timeoutTCP** - session timeout. Any integer number in range 1-65534 (default 2)
+* **timeoutUDP** - session timeout. Any integer number in range 1-65534 (default 5)
