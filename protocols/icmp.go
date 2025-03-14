@@ -10,8 +10,7 @@ import (
 
 const (
 	// ProtocolICMP the name of the protocol
-	ProtocolICMP   = "icmp"
-	packagesNumber = 5
+	ProtocolICMP = "icmp"
 )
 
 // ICMPTest define, run and process return code of icmp test command
@@ -21,7 +20,13 @@ type ICMPTest struct {
 }
 
 // NewICMPTest creates new instance of ConnectivityTestParameters
-func NewICMPTest(mtu int, protocolVersion int, serverIP string, intefaceName string, negative bool) *ICMPTest {
+func NewICMPTest(
+	mtu int,
+	protocolVersion int,
+	serverIP string,
+	intefaceName string,
+	packagesNumber int,
+	negative bool) *ICMPTest {
 	if intefaceName != "" {
 		intFace, err := net.InterfaceByName(intefaceName)
 		if err != nil {
@@ -36,13 +41,15 @@ func NewICMPTest(mtu int, protocolVersion int, serverIP string, intefaceName str
 			MTU:             mtu,
 			ServerIP:        serverIP,
 			ProtocolVersion: protocolVersion,
+			PackagesNumber:  packagesNumber,
 			Negative:        negative,
 		}}
 }
 
 func (test *ICMPTest) defineCommand() string {
 	command := []string{"ping", fmt.Sprintf("-%d", test.common.ProtocolVersion),
-		test.common.ServerIP, "-c", fmt.Sprintf("%d", packagesNumber), "-w", fmt.Sprintf("%d", packagesNumber),
+		test.common.ServerIP, "-c", fmt.Sprintf("%d", test.common.PackagesNumber), "-w",
+		fmt.Sprintf("%d", test.common.PackagesNumber),
 		"-s", fmt.Sprintf("%d", test.common.MTU), "-M", "do"}
 	if test.InterfaceName != "" {
 		command = append(command, fmt.Sprintf("-I %s", test.InterfaceName))

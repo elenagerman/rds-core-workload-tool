@@ -11,23 +11,50 @@ import (
 
 const (
 	// ProtocolTCP the name of the protocol
-	ProtocolTCP       = "tcp"
-	packagesNumberTCP = 5
-	timeoutTCP        = 2
-	timeoutDialTCP    = 10
+	ProtocolTCP    = "tcp"
+	timeoutDialTCP = 10
 )
 
 // TCPTest define, run and process return code of tcp test command
 type TCPTest struct {
-	CommonTest
+	common        CommonTest
 	ServerPort    int
+	Timeout       time.Duration
 	InterfaceName *net.Interface
+}
+
+// NewTCPTest creates new instance of ConnectivityTestParameters
+func NewTCPTest(
+	mtu int,
+	protocolVersion int,
+	serverIP string,
+	serverPort int,
+	packagesNumber int,
+	negative bool,
+	timeout int,
+	interfaceName string) *TCPTest {
+	intFace, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		fmt.Print(err)
+		os.Exit(1)
+	}
+	return &TCPTest{
+		InterfaceName: intFace,
+		ServerPort:    serverPort,
+		Timeout:       time.Duration(timeout),
+		common: CommonTest{
+			MTU:             mtu,
+			ServerIP:        serverIP,
+			ProtocolVersion: protocolVersion,
+			PackagesNumber:  packagesNumber,
+			Negative:        negative,
+		}}
 }
 
 // RunTest runs the test
 func (test *TCPTest) RunTest() {
 	err := test.testTCP()
-	if test.Negative {
+	if test.common.Negative {
 		if err != nil {
 			log.Print("Negative TCP test passed")
 			os.Exit(0)
@@ -44,49 +71,40 @@ func (test *TCPTest) RunTest() {
 	os.Exit(1)
 }
 
-// NewTCPTest creates new instance of ConnectivityTestParameters
-func NewTCPTest(mtu int, protocolVersion int, serverIP string, serverPort int, negative bool, interfaceName string) *TCPTest {
-	intFace, err := net.InterfaceByName(interfaceName)
-	if err != nil {
-		fmt.Print(err)
-		os.Exit(1)
-	}
-	return &TCPTest{CommonTest{mtu, serverIP, protocolVersion, negative}, serverPort, intFace}
-}
-
 func (test *TCPTest) testTCP() error {
 	raddr := test.resolveAddress()
 	dialer := net.Dialer{Timeout: timeoutDialTCP * time.Second, Control: controlOnConnSetup(test.InterfaceName.Name)}
 	connection, err := dialer.Dial(
-		fmt.Sprintf("%s%d", ProtocolTCP, test.ProtocolVersion),
+		fmt.Sprintf("%s%d", ProtocolTCP, test.common.ProtocolVersion),
 		raddr.String())
 
 	if err != nil {
 		return err
 	}
 	var testString string
-	for i := 0; i < test.MTU; i++ {
+	for i := 0; i < test.common.MTU; i++ {
 		testString += "a"
 	}
 
-	fmt.Printf(fmt.Sprintf("TCP PING %s %d(%d) bytes of data.\n", test.ServerIP, test.MTU, test.MTU+28))
+	fmt.Printf(fmt.Sprintf("TCP PING %s %d(%d) bytes of data.\n",
+		test.common.ServerIP, test.common.MTU, test.common.MTU+28))
 	var (
 		statTotalTime      int64
 		exitCode           int
 		statPacketLost     int
 		statPacketReceived int
 	)
-	for i := 1; i <= packagesNumberTCP; i++ {
+	for i := 1; i <= test.common.PackagesNumber; i++ {
 		byteTestString := []byte(testString)
 		test.runTCPPing(connection, i, byteTestString, &statPacketLost, &statPacketReceived, &statTotalTime, &exitCode)
 	}
 
-	fmt.Printf("--- %s TCP statistics ---\n", test.ServerIP)
+	fmt.Printf("--- %s TCP statistics ---\n", test.common.ServerIP)
 	fmt.Printf(
 		"%d packets transmitted, %d received, %d packet loss, time %dms\n",
-		packagesNumberTCP,
+		test.common.PackagesNumber,
 		statPacketReceived,
-		totalPackageLoss(packagesNumberTCP, statPacketLost),
+		totalPackageLoss(test.common.PackagesNumber, statPacketLost),
 		statTotalTime)
 
 	if exitCode == 1 {
@@ -106,7 +124,7 @@ func (test *TCPTest) runTCPPing(
 
 	time.Sleep(1 * time.Second)
 
-	deadline := time.Now().Add(timeoutTCP * time.Second)
+	deadline := time.Now().Add(test.Timeout * time.Second)
 	conn.SetDeadline(deadline)
 	startTime := time.Now()
 	_, err := conn.Write(byteTestString)
@@ -114,7 +132,7 @@ func (test *TCPTest) runTCPPing(
 		fmt.Print(err)
 	}
 
-	buffer := make([]byte, test.MTU)
+	buffer := make([]byte, test.common.MTU)
 	readBufferSized, err := conn.Read(buffer)
 	elapsed := time.Since(startTime)
 	if err != nil {
@@ -135,8 +153,8 @@ func (test *TCPTest) runTCPPing(
 }
 
 func (test *TCPTest) resolveAddress() *net.TCPAddr {
-	addr, err := net.ResolveTCPAddr(fmt.Sprintf("%s%d", ProtocolTCP, test.ProtocolVersion),
-		fmt.Sprintf("[%s]:%d", test.ServerIP, test.ServerPort))
+	addr, err := net.ResolveTCPAddr(fmt.Sprintf("%s%d", ProtocolTCP, test.common.ProtocolVersion),
+		fmt.Sprintf("[%s]:%d", test.common.ServerIP, test.ServerPort))
 	if err != nil {
 		fmt.Print(err)
 		os.Exit(1)
